@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Study Group Platform</title>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
+    body { background: #f4f6f9; margin: 0; padding: 20px; }
+    .container { max-width: 800px; margin: 0 auto; }
+    .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    h2, h3 { margin-top: 0; color: #333; }
+    label { font-weight: bold; font-size: 14px; }
+    input, select, textarea, button { width: 100%; padding: 10px; margin-top: 6px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+    button { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    .btn-danger { background: #dc3545; width: auto; padding: 6px 12px; }
+    .btn-success { background: #28a745; width: auto; }
+    .btn-secondary { background: #6c757d; width: auto; margin-bottom: 15px; }
+    .error { color: #dc3545; font-weight: bold; margin-bottom: 10px; }
+    .group-item { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding: 12px 0; }
+    .feed { background: #f8f9fa; border: 1px solid #ddd; padding: 12px; height: 220px; overflow-y: auto; border-radius: 4px; margin-bottom: 10px; }
+    .msg { background: white; padding: 8px 12px; border-radius: 4px; margin-bottom: 8px; border-left: 4px solid #007bff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- 1. LOGIN & REGISTER PAGE -->
+    <div id="loginPage" class="card">
+      <h2>Portal Login / Register</h2>
+      <div id="loginError" class="error"></div>
+      
+      <label>Username</label>
+      <input type="text" id="loginUser" placeholder="Enter username..." />
+      
+      <label>Role</label>
+      <select id="loginRole">
+        <option value="student">Student</option>
+        <option value="admin">Admin</option>
+      </select>
+      
+      <button onclick="login()">Enter Platform</button>
+    </div>
+
+    <!-- 2. MAIN DASHBOARD PAGE -->
+    <div id="dashboardPage" style="display:none;">
+      <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 id="userWelcome" style="margin:0;">Welcome</h3>
+        <button class="btn-danger" onclick="logout()">Logout</button>
+      </div>
+
+      <!-- Admin View -->
+      <div id="adminView" class="card" style="display:none;">
+        <h3>Admin Platform Activity</h3>
+        <p id="adminStats">Loading stats...</p>
+      </div>
+
+      <!-- Student View: Create Group -->
+      <div id="studentView" class="card">
+        <h3>Create Study Group</h3>
+        <div id="createError" class="error"></div>
+        
+        <label>Group Name *</label>
+        <input type="text" id="grpName" placeholder="e.g. Java Developers" />
+        
+        <label>Subject *</label>
+        <input type="text" id="grpSub" placeholder="e.g. Computer Science" />
+        
+        <button onclick="createGroup()">Create Group</button>
+      </div>
+
+      <!-- Group Directory -->
+      <div class="card">
+        <h3>Available Study Groups</h3>
+        <div id="groupDirectory">Loading groups...</div>
+      </div>
+    </div>
+
+    <!-- 3. GROUP MESSAGE BOARD PAGE -->
+    <div id="boardPage" class="card" style="display:none;">
+      <button class="btn-secondary" onclick="showDashboard()">← Back to Dashboard</button>
+      <h2 id="boardTitle">Group Title</h2>
+      <p id="boardMembers" style="color:#666; font-size: 14px;"></p>
+      
+      <div id="boardAccessContainer">
+        <div id="msgFeed" class="feed"></div>
+        <textarea id="msgInput" rows="3" placeholder="Post a question or message..."></textarea>
+        <button class="btn-success" onclick="postMessage()">Post Message</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // --- IN-MEMORY DATA STORAGE ---
+    let users = [
+      { id: 1, username: 'admin', role: 'admin' },
+      { id: 2, username: 'student1', role: 'student' }
+    ];
+
+    let groups = [
+      {
+        id: 1,
+        name: 'Web Dev Mastery',
+        subject: 'Computer Science',
+        members: ['student1'],
+        messages: [
+          { sender: 'student1', text: 'Welcome to the Web Dev study group!', time: '10:00 AM' }
+        ]
+      }
+    ];
+
+    let currentUser = null;
+    let activeGroupId = null;
+
+    // --- AUTHENTICATION ---
+    function login() {
+      const username = document.getElementById('loginUser').value.trim();
+      const role = document.getElementById('loginRole').value;
+      const err = document.getElementById('loginError');
+      err.innerText = '';
+
+      if (!username) {
+        err.innerText = 'Please enter a username.';
+        return;
+      }
+
+      const cleanUser = username.toLowerCase();
+      let user = users.find(u => u.username.toLowerCase() === cleanUser && u.role === role);
+
+      if (!user) {
+        user = { id: Date.now(), username: cleanUser, role: role };
+        users.push(user);
+      }
+
+      currentUser = user;
+      showDashboard();
+    }
+
+    function logout() {
+      currentUser = null;
+      document.getElementById('dashboardPage').style.display = 'none';
+      document.getElementById('boardPage').style.display = 'none';
+      document.getElementById('loginPage').style.display = 'block';
+      document.getElementById('loginUser').value = '';
+    }
+
+    // --- DASHBOARD FUNCTIONS ---
+    function showDashboard() {
+      document.getElementById('loginPage').style.display = 'none';
+      document.getElementById('boardPage').style.display = 'none';
+      document.getElementById('dashboardPage').style.display = 'block';
+
+      document.getElementById('userWelcome').innerText = `User: ${currentUser.username} (${currentUser.role.toUpperCase()})`;
+
+      if (currentUser.role === 'admin') {
+        document.getElementById('adminView').style.display = 'block';
+        document.getElementById('studentView').style.display = 'none';
+      } else {
+        document.getElementById('adminView').style.display = 'none';
+        document.getElementById('studentView').style.display = 'block';
+      }
+
+      loadDirectory();
+    }
+
+    function loadDirectory() {
+      // Admin Stats
+      if (currentUser.role === 'admin') {
+        const studentCount = users.filter(u => u.role === 'student').length;
+        document.getElementById('adminStats').innerText = 
+          `Total Registered Users: ${users.length} | Students: ${studentCount} | Active Study Groups: ${groups.length}`;
+      }
+
+      // Group List
+      const dir = document.getElementById('groupDirectory');
+      if (groups.length === 0) {
+        dir.innerHTML = '<p>No study groups available yet.</p>';
+        return;
+      }
+
+      dir.innerHTML = groups.map(g => {
+        const isMember = g.members.includes(currentUser.username);
+        return `
+          <div class="group-item">
+            <div>
+              <strong>${g.name}</strong> (${g.subject})<br/>
+              <small style="color:#666;">Members: ${g.members.length}</small>
+            </div>
+            <div>
+              ${isMember || currentUser.role === 'admin' 
+                ? `<button style="width:auto;" onclick="openBoard(${g.id})">Open Board</button>`
+                : `<button class="btn-success" onclick="joinGroup(${g.id})">Join Group</button>`
+              }
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // --- GROUP OPERATIONS ---
+    function createGroup() {
+      const name = document.getElementById('grpName').value.trim();
+      const subject = document.getElementById('grpSub').value.trim();
+      const err = document.getElementById('createError');
+      err.innerText = '';
+
+      // Mandatory validation
+      if (!name || !subject) {
+        err.innerText = 'Group Name and Subject are mandatory!';
+        return;
+      }
+
+      const newGroup = {
+        id: Date.now(),
+        name: name,
+        subject: subject,
+        members: [currentUser.username], // Creator automatically added as member
+        messages: []
+      };
+
+      groups.push(newGroup);
+      document.getElementById('grpName').value = '';
+      document.getElementById('grpSub').value = '';
+      loadDirectory();
+    }
+
+    function joinGroup(groupId) {
+      const group = groups.find(g => g.id === groupId);
+      if (!group) return;
+
+      // Edge case: Already a member
+      if (group.members.includes(currentUser.username)) {
+        alert('You are already a member of this group!');
+        return;
+      }
+
+      group.members.push(currentUser.username);
+      loadDirectory();
+    }
+
+    // --- MESSAGE BOARD OPERATIONS ---
+    function openBoard(groupId) {
+      activeGroupId = groupId;
+      const group = groups.find(g => g.id === groupId);
+      if (!group) return;
+
+      // Edge case: Restrict non-members
+      const isMember = group.members.includes(currentUser.username) || currentUser.role === 'admin';
+      
+      document.getElementById('dashboardPage').style.display = 'none';
+      document.getElementById('boardPage').style.display = 'block';
+
+      if (!isMember) {
+        document.getElementById('boardTitle').innerText = 'Access Restricted';
+        document.getElementById('boardMembers').innerText = '';
+        document.getElementById('boardAccessContainer').innerHTML = 
+          `<p class="error">Access Denied: Only members of this group can view or post on the message board.</p>`;
+        return;
+      }
+
+      document.getElementById('boardTitle').innerText = `${group.name} (${group.subject})`;
+      document.getElementById('boardMembers').innerText = `Members: ${group.members.join(', ')}`;
+
+      renderMessages(group);
+    }
+
+    function renderMessages(group) {
+      const feed = document.getElementById('msgFeed');
+      if (group.messages.length === 0) {
+        feed.innerHTML = '<p>No messages yet. Be the first to ask a question!</p>';
+      } else {
+        feed.innerHTML = group.messages.map(m => `
+          <div class="msg">
+            <strong>${m.sender}:</strong> ${m.text}
+            <br/><span style="font-size:10px; color:#888;">${m.time}</span>
+          </div>
+        `).join('');
+      }
+    }
+
+    function postMessage() {
+      const text = document.getElementById('msgInput').value.trim();
+      if (!text) return;
+
+      const group = groups.find(g => g.id === activeGroupId);
+      if (!group) return;
+
+      // Edge case: Prevent non-members from posting
+      if (!group.members.includes(currentUser.username)) {
+        alert('Forbidden: Non-members cannot post messages to this group.');
+        return;
+      }
+
+      const msg = {
+        sender: currentUser.username,
+        text: text,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      group.messages.push(msg);
+      document.getElementById('msgInput').value = '';
+      renderMessages(group);
+    }
+  </script>
+</body>
+</html>
